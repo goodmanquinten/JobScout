@@ -1,0 +1,1 @@
+"""JobScout: weekly job finder."""

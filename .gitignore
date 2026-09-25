@@ -1,7 +1,12 @@
 .env
 *.db
+*.log
+*.lock
 token.json
 credentials.json
-*.log
+profile/
+tests/fixtures/handshake_real.html
 .venv/
 __pycache__/
+.pytest_cache/
+.ruff_cache/
