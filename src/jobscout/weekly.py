@@ -37,8 +37,8 @@ FRESH_DAYS = 8
 def setup_logging() -> None:
     logging.basicConfig(filename="jobscout.log", level=logging.INFO, format=LOG_FORMAT)
     # httpx logs full request URLs at INFO, and Telegram URLs contain the bot token.
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    for name in ("httpx", "httpx2", "httpcore"):  # the anthropic SDK logs via "httpx2"
+        logging.getLogger(name).setLevel(logging.WARNING)
 
 
 @dataclass(frozen=True)

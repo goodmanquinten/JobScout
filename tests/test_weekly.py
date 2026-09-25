@@ -89,4 +89,5 @@ def test_setup_logging_hides_http_urls(monkeypatch, tmp_path):
 
     monkeypatch.chdir(tmp_path)
     setup_logging()
-    assert logging.getLogger("httpx").getEffectiveLevel() == logging.WARNING
+    for name in ("httpx", "httpx2", "httpcore"):
+        assert logging.getLogger(name).getEffectiveLevel() == logging.WARNING
