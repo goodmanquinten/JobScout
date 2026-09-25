@@ -102,6 +102,11 @@ Rejects when:
 - Location is outside the U.S. and the company is not flagged `allow_non_us`
   in the watchlist. "Remote" with no country counts as U.S.
 
+- For big employers, a per-company `title_include` list keeps only titles containing
+  one of its words (e.g. Anduril's 2,300+ postings reduced to finance roles).
+- Locations with a country-code prefix other than `US-` (Ashby style, e.g. `IN-Pune`)
+  count as non-U.S.
+
 Rejection reasons are stored so a rule can be audited and tuned.
 
 ### Score (Claude)
