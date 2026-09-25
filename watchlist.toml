@@ -1,0 +1,32 @@
+# Candidate profile (used by the rules filter and the Claude scorer) and the
+# companies whose public job boards are checked every week.
+# Check tokens with: uv run python -m jobscout.check
+
+[profile]
+available_from = 2027-06-01
+country = "US"
+max_years_required = 2
+targets = [
+    "investment analyst (equity research, public or private markets)",
+    "portfolio management analyst",
+    "markets / sales and trading analyst",
+    "financial data analytics and sales (e.g. Bloomberg A&S)",
+    "wealth or financial advisory analyst",
+    "corporate finance advisory analyst",
+    "strategic finance / FP&A analyst",
+]
+summary = """MSc Finance, Nova SBE (June 2027). B.S. Finance and B.S. Management, Arizona State \
+University (major GPA 4.0). U.S. citizen, no sponsorship needed. Builds Python options \
+analytics (Greeks, implied volatility, dealer gamma exposure) and uses Bloomberg. Strong Excel \
+modeling, DCF and comps. 2.5 years as a staff accountant intern (consolidation, variance \
+analysis, process automation). Member of the Nova Students Portfolio student-managed fund."""
+
+[[company]]
+name = "ICONIQ"
+ats = "greenhouse"
+token = "iconiq"
+
+[[company]]
+name = "Harrison Street"
+ats = "lever"
+token = "harrisonst"

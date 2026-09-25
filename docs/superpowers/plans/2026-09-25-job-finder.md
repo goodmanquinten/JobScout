@@ -404,7 +404,7 @@ allow_non_us = true
 def test_unknown_ats_rejected(tmp_path):
     path = tmp_path / "w.toml"
     path.write_text(
-        '[profile]\navailable_from = 2027-06-01\n\n'
+        "[profile]\navailable_from = 2027-06-01\n\n"
         '[[company]]\nname = "X"\nats = "workday"\ntoken = "x"\n',
         encoding="utf-8",
     )
@@ -1134,8 +1134,6 @@ from jobscout.models import RuleResult
 Then append:
 
 ```python
-
-
 def test_digest_candidates_order_and_exclusions(store):
     low = add_scored(store, NOW, fit=5, source_id="low")
     late = add_scored(store, NOW, fit=8, source_id="late", deadline=date(2026, 11, 1))
@@ -1169,7 +1167,10 @@ def test_jobs_already_in_a_digest_are_not_repeated(store):
 def test_set_status_and_list(store):
     a = add_scored(store, NOW, fit=9, source_id="a", deadline=date(2026, 10, 10))
     b = add_scored(store, NOW, fit=7, source_id="b")
-    assert store.set_status(num_of(store, a), "saved", NOW) == ("ICONIQ", "Analyst, Financial Advisory")
+    assert store.set_status(num_of(store, a), "saved", NOW) == (
+        "ICONIQ",
+        "Analyst, Financial Advisory",
+    )
     store.set_status(num_of(store, b), "applied", NOW)
     assert store.set_status(999, "saved", NOW) is None
     assert store.state_of(a.job_id) == "saved"
@@ -1220,122 +1221,138 @@ Expected: the new tests FAIL with `AttributeError: 'Store' object has no attribu
 - [ ] **Step 3: Append methods to `Store` in `src/jobscout/store.py`**
 
 ```python
-    # --- digests -------------------------------------------------------------------
+# --- digests -------------------------------------------------------------------
 
-    def digest_candidates(
-        self, min_fit: int, since: datetime, today: date, limit: int
-    ) -> list[DigestRow]:
-        """Best new, still-open jobs never shown in a digest."""
-        rows = self.conn.execute(
-            _ROWS + " WHERE s.fit >= ? AND j.last_seen >= ?"
-            " AND COALESCE(st.state, 'new') = 'new'"
-            f" AND ({_DEADLINE} IS NULL OR {_DEADLINE} >= ?)"
-            " AND j.job_id NOT IN (SELECT job_id FROM digest_items)"
-            f" ORDER BY s.fit DESC, {_DEADLINE} IS NULL, {_DEADLINE}, j.num LIMIT ?",
-            (min_fit, since.isoformat(), today.isoformat(), limit),
-        ).fetchall()
-        return [_row(r) for r in rows]
 
-    def create_digest(self, body: str, job_ids: list[str], now: datetime) -> int:
-        with self.conn:
-            cur = self.conn.execute(
-                "INSERT INTO digests (created_at, body) VALUES (?, ?)", (now.isoformat(), body)
-            )
-            digest_id = cur.lastrowid
-            self.conn.executemany(
-                "INSERT INTO digest_items (digest_id, position, job_id) VALUES (?, ?, ?)",
-                [(digest_id, i, job_id) for i, job_id in enumerate(job_ids, start=1)],
-            )
-        return digest_id
+def digest_candidates(
+    self, min_fit: int, since: datetime, today: date, limit: int
+) -> list[DigestRow]:
+    """Best new, still-open jobs never shown in a digest."""
+    rows = self.conn.execute(
+        _ROWS + " WHERE s.fit >= ? AND j.last_seen >= ?"
+        " AND COALESCE(st.state, 'new') = 'new'"
+        f" AND ({_DEADLINE} IS NULL OR {_DEADLINE} >= ?)"
+        " AND j.job_id NOT IN (SELECT job_id FROM digest_items)"
+        f" ORDER BY s.fit DESC, {_DEADLINE} IS NULL, {_DEADLINE}, j.num LIMIT ?",
+        (min_fit, since.isoformat(), today.isoformat(), limit),
+    ).fetchall()
+    return [_row(r) for r in rows]
 
-    def last_digest_at(self) -> datetime | None:
-        row = self.conn.execute("SELECT MAX(created_at) AS at FROM digests").fetchone()
-        return datetime.fromisoformat(row["at"]) if row["at"] else None
 
-    def mark_digest_sent(self, digest_id: int, now: datetime) -> None:
-        with self.conn:
-            self.conn.execute(
-                "UPDATE digests SET sent_at = ? WHERE id = ?", (now.isoformat(), digest_id)
-            )
+def create_digest(self, body: str, job_ids: list[str], now: datetime) -> int:
+    with self.conn:
+        cur = self.conn.execute(
+            "INSERT INTO digests (created_at, body) VALUES (?, ?)", (now.isoformat(), body)
+        )
+        digest_id = cur.lastrowid
+        self.conn.executemany(
+            "INSERT INTO digest_items (digest_id, position, job_id) VALUES (?, ?, ?)",
+            [(digest_id, i, job_id) for i, job_id in enumerate(job_ids, start=1)],
+        )
+    return digest_id
 
-    def unsent_digests(self) -> list[tuple[int, str]]:
-        rows = self.conn.execute(
-            "SELECT id, body FROM digests WHERE sent_at IS NULL ORDER BY id"
-        ).fetchall()
-        return [(r["id"], r["body"]) for r in rows]
 
-    # --- status --------------------------------------------------------------------
+def last_digest_at(self) -> datetime | None:
+    row = self.conn.execute("SELECT MAX(created_at) AS at FROM digests").fetchone()
+    return datetime.fromisoformat(row["at"]) if row["at"] else None
 
-    def set_status(self, num: int, state: JobState, now: datetime) -> tuple[str, str] | None:
-        """Set a job's state by its #num. Returns (company, title), or None if unknown."""
-        job = self.conn.execute(
-            "SELECT job_id, company, title FROM jobs WHERE num = ?", (num,)
-        ).fetchone()
-        if job is None:
-            return None
-        with self.conn:
-            self.conn.execute(
-                "INSERT OR REPLACE INTO status (job_id, state, updated_at) VALUES (?, ?, ?)",
-                (job["job_id"], state, now.isoformat()),
-            )
-        return job["company"], job["title"]
 
-    def state_of(self, job_id: str) -> JobState:
-        row = self.conn.execute("SELECT state FROM status WHERE job_id = ?", (job_id,)).fetchone()
-        return row["state"] if row else "new"
+def mark_digest_sent(self, digest_id: int, now: datetime) -> None:
+    with self.conn:
+        self.conn.execute(
+            "UPDATE digests SET sent_at = ? WHERE id = ?", (now.isoformat(), digest_id)
+        )
 
-    def saved_and_applied(self) -> list[tuple[DigestRow, str]]:
-        rows = self.conn.execute(
-            _ROWS + " WHERE st.state IN ('saved', 'applied')"
-            f" ORDER BY st.state DESC, {_DEADLINE} IS NULL, {_DEADLINE}, j.num"
-        ).fetchall()
-        return [(_row(r), r["state"]) for r in rows]
 
-    # --- alerts --------------------------------------------------------------------
+def unsent_digests(self) -> list[tuple[int, str]]:
+    rows = self.conn.execute(
+        "SELECT id, body FROM digests WHERE sent_at IS NULL ORDER BY id"
+    ).fetchall()
+    return [(r["id"], r["body"]) for r in rows]
 
-    def urgent_candidates(self, today: date, min_fit: int, within_days: int) -> list[DigestRow]:
-        until = today + timedelta(days=within_days)
-        rows = self.conn.execute(
-            _ROWS + f" WHERE s.fit >= ? AND {_DEADLINE} BETWEEN ? AND ?"
-            " AND COALESCE(st.state, 'new') IN ('new', 'saved')"
-            " AND NOT EXISTS (SELECT 1 FROM alerts a"
-            "                 WHERE a.job_id = j.job_id AND a.kind = 'urgent')"
-            f" ORDER BY {_DEADLINE}, j.num",
-            (min_fit, today.isoformat(), until.isoformat()),
-        ).fetchall()
-        return [_row(r) for r in rows]
 
-    def reminder_candidates(self, today: date, days_before: int) -> list[DigestRow]:
-        until = today + timedelta(days=days_before)
-        rows = self.conn.execute(
-            _ROWS + f" WHERE st.state = 'saved' AND {_DEADLINE} BETWEEN ? AND ?"
-            " AND NOT EXISTS (SELECT 1 FROM alerts a"
-            "                 WHERE a.job_id = j.job_id AND a.kind = 'reminder')"
-            f" ORDER BY {_DEADLINE}, j.num",
-            (today.isoformat(), until.isoformat()),
-        ).fetchall()
-        return [_row(r) for r in rows]
+# --- status --------------------------------------------------------------------
 
-    def record_alert(self, job_id: str, kind: str, now: datetime) -> None:
-        with self.conn:
-            self.conn.execute(
-                "INSERT OR IGNORE INTO alerts (job_id, kind, sent_at) VALUES (?, ?, ?)",
-                (job_id, kind, now.isoformat()),
-            )
 
-    # --- telegram ------------------------------------------------------------------
+def set_status(self, num: int, state: JobState, now: datetime) -> tuple[str, str] | None:
+    """Set a job's state by its #num. Returns (company, title), or None if unknown."""
+    job = self.conn.execute(
+        "SELECT job_id, company, title FROM jobs WHERE num = ?", (num,)
+    ).fetchone()
+    if job is None:
+        return None
+    with self.conn:
+        self.conn.execute(
+            "INSERT OR REPLACE INTO status (job_id, state, updated_at) VALUES (?, ?, ?)",
+            (job["job_id"], state, now.isoformat()),
+        )
+    return job["company"], job["title"]
 
-    def telegram_offset(self) -> int | None:
-        row = self.conn.execute("SELECT update_id FROM telegram_offset WHERE id = 1").fetchone()
-        return row["update_id"] if row else None
 
-    def set_telegram_offset(self, update_id: int) -> None:
-        with self.conn:
-            self.conn.execute(
-                "INSERT INTO telegram_offset (id, update_id) VALUES (1, ?)"
-                " ON CONFLICT(id) DO UPDATE SET update_id = excluded.update_id",
-                (update_id,),
-            )
+def state_of(self, job_id: str) -> JobState:
+    row = self.conn.execute("SELECT state FROM status WHERE job_id = ?", (job_id,)).fetchone()
+    return row["state"] if row else "new"
+
+
+def saved_and_applied(self) -> list[tuple[DigestRow, str]]:
+    rows = self.conn.execute(
+        _ROWS + " WHERE st.state IN ('saved', 'applied')"
+        f" ORDER BY st.state DESC, {_DEADLINE} IS NULL, {_DEADLINE}, j.num"
+    ).fetchall()
+    return [(_row(r), r["state"]) for r in rows]
+
+
+# --- alerts --------------------------------------------------------------------
+
+
+def urgent_candidates(self, today: date, min_fit: int, within_days: int) -> list[DigestRow]:
+    until = today + timedelta(days=within_days)
+    rows = self.conn.execute(
+        _ROWS + f" WHERE s.fit >= ? AND {_DEADLINE} BETWEEN ? AND ?"
+        " AND COALESCE(st.state, 'new') IN ('new', 'saved')"
+        " AND NOT EXISTS (SELECT 1 FROM alerts a"
+        "                 WHERE a.job_id = j.job_id AND a.kind = 'urgent')"
+        f" ORDER BY {_DEADLINE}, j.num",
+        (min_fit, today.isoformat(), until.isoformat()),
+    ).fetchall()
+    return [_row(r) for r in rows]
+
+
+def reminder_candidates(self, today: date, days_before: int) -> list[DigestRow]:
+    until = today + timedelta(days=days_before)
+    rows = self.conn.execute(
+        _ROWS + f" WHERE st.state = 'saved' AND {_DEADLINE} BETWEEN ? AND ?"
+        " AND NOT EXISTS (SELECT 1 FROM alerts a"
+        "                 WHERE a.job_id = j.job_id AND a.kind = 'reminder')"
+        f" ORDER BY {_DEADLINE}, j.num",
+        (today.isoformat(), until.isoformat()),
+    ).fetchall()
+    return [_row(r) for r in rows]
+
+
+def record_alert(self, job_id: str, kind: str, now: datetime) -> None:
+    with self.conn:
+        self.conn.execute(
+            "INSERT OR IGNORE INTO alerts (job_id, kind, sent_at) VALUES (?, ?, ?)",
+            (job_id, kind, now.isoformat()),
+        )
+
+
+# --- telegram ------------------------------------------------------------------
+
+
+def telegram_offset(self) -> int | None:
+    row = self.conn.execute("SELECT update_id FROM telegram_offset WHERE id = 1").fetchone()
+    return row["update_id"] if row else None
+
+
+def set_telegram_offset(self, update_id: int) -> None:
+    with self.conn:
+        self.conn.execute(
+            "INSERT INTO telegram_offset (id, update_id) VALUES (1, ?)"
+            " ON CONFLICT(id) DO UPDATE SET update_id = excluded.update_id",
+            (update_id,),
+        )
 ```
 
 - [ ] **Step 4: Run tests**
@@ -1469,7 +1486,9 @@ def test_lever(httpx_mock):
         url="https://api.lever.co/v0/postings/harrisonst?mode=json", json=load("lever.json")
     )
     with httpx.Client() as client:
-        [p] = fetch_company(client, Company(name="Harrison Street", ats="lever", token="harrisonst"))
+        [p] = fetch_company(
+            client, Company(name="Harrison Street", ats="lever", token="harrisonst")
+        )
     assert p.title == "Summer 2027 Portfolio Management Analyst"
     assert p.location == "Chicago, IL"
     assert "early June 2027" in p.description
@@ -1487,9 +1506,7 @@ def test_ashby_skips_unlisted(httpx_mock):
 
 
 def test_http_error_becomes_source_error(httpx_mock):
-    httpx_mock.add_response(
-        url="https://api.lever.co/v0/postings/nope?mode=json", status_code=404
-    )
+    httpx_mock.add_response(url="https://api.lever.co/v0/postings/nope?mode=json", status_code=404)
     with httpx.Client() as client, pytest.raises(SourceError):
         fetch_company(client, Company(name="Nope", ats="lever", token="nope"))
 
@@ -2304,7 +2321,9 @@ def test_format_row_escapes_and_omits_missing_deadline():
 
 
 def test_digest_with_footer():
-    text = format_digest([ROW], below=23, failed_scores=2, failed_sources=["Harrison Street (lever)"], min_fit=6)
+    text = format_digest(
+        [ROW], below=23, failed_scores=2, failed_sources=["Harrison Street (lever)"], min_fit=6
+    )
     lines = text.split("\n")
     assert lines[0] == "<b>Jobs this week</b>"
     assert "#12 <b>ICONIQ</b>" in text
@@ -2327,7 +2346,9 @@ def test_urgent_and_reminder():
 
 
 def test_format_list():
-    other = ROW.model_copy(update={"num": 3, "company": "HSBC", "title": "S&T Graduate", "deadline": None})
+    other = ROW.model_copy(
+        update={"num": 3, "company": "HSBC", "title": "S&T Graduate", "deadline": None}
+    )
     text = format_list([(ROW, "saved"), (other, "applied")])
     assert text == (
         "<b>Saved</b>\n#12 ICONIQ, Analyst, Financial Advisory · closes Oct 30\n\n"
@@ -2571,7 +2592,9 @@ def test_parse_command(text, expected):
 def test_handle_sets_status(store):
     p = add_scored(store, NOW, fit=9)
     n = num_of(store, p)
-    assert handle(store, f"/applied {n}", NOW) == f"#{n} ICONIQ, Analyst, Financial Advisory: applied"
+    assert (
+        handle(store, f"/applied {n}", NOW) == f"#{n} ICONIQ, Analyst, Financial Advisory: applied"
+    )
     assert store.state_of(p.job_id) == "applied"
 
 
