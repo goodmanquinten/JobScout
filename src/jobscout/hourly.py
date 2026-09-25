@@ -17,7 +17,7 @@ from jobscout.config import Settings
 from jobscout.lock import LockBusy, file_lock
 from jobscout.store import Store
 from jobscout.telegram import TelegramError, get_updates, send_message
-from jobscout.weekly import LOG_FORMAT
+from jobscout.weekly import setup_logging
 
 log = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ def run_hourly(
 
 
 def main() -> int:
-    logging.basicConfig(filename="jobscout.log", level=logging.INFO, format=LOG_FORMAT)
+    setup_logging()
     try:
         with file_lock():
             settings = Settings()

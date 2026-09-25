@@ -80,3 +80,13 @@ def test_source_title_include_is_applied(store):
     source = Source("Big Co", lambda: [GOOD, WEAK], title_include=("investment",))
     run_weekly(store, [source], fake_scorer(calls), "m", PROFILE, [].append, NOW)
     assert calls == ["good"]
+
+
+def test_setup_logging_hides_http_urls(monkeypatch, tmp_path):
+    import logging
+
+    from jobscout.weekly import setup_logging
+
+    monkeypatch.chdir(tmp_path)
+    setup_logging()
+    assert logging.getLogger("httpx").getEffectiveLevel() == logging.WARNING

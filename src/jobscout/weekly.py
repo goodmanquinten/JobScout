@@ -34,6 +34,13 @@ DIGEST_SIZE = 8
 FRESH_DAYS = 8
 
 
+def setup_logging() -> None:
+    logging.basicConfig(filename="jobscout.log", level=logging.INFO, format=LOG_FORMAT)
+    # httpx logs full request URLs at INFO, and Telegram URLs contain the bot token.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+
+
 @dataclass(frozen=True)
 class Source:
     name: str
@@ -110,7 +117,7 @@ def build_sources(client: httpx.Client, settings: Settings, watchlist: Watchlist
 
 
 def main() -> int:
-    logging.basicConfig(filename="jobscout.log", level=logging.INFO, format=LOG_FORMAT)
+    setup_logging()
     try:
         with file_lock():
             settings = Settings()
