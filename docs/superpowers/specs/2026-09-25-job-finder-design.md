@@ -26,7 +26,8 @@ Automatic applying is out of scope for every phase.
   Excel modeling, DCF/comps, SQL, accounting close and consolidation
 
 The profile lives in `watchlist.toml` (see Config) plus the resume text in
-`profile/resume.md`, so both can change without code edits.
+`profile/resume.md` (gitignored, since it holds contact details), so both can
+change without code edits.
 
 ## Project setup
 
@@ -124,18 +125,20 @@ count in the digest).
 
 ### Store (SQLite, `jobscout.db`)
 
-- `jobs`: job_id PK, source, source_id, url, company, title, location,
+- `jobs`: num INTEGER PK AUTOINCREMENT (the stable `#N` shown to the user),
+  job_id UNIQUE, source, source_id, url, company, title, location,
   description, content_hash, posted_at, deadline, first_seen, last_seen
 - `rule_results`: job_id, keep, reason, checked_at
 - `scores`: job_id, content_hash, fit, timing, deadline, reason, model, scored_at, attempts
 - `status`: job_id, state (`new|saved|applied|skipped`), updated_at
 - `alerts`: job_id, kind (`urgent|reminder`), sent_at, UNIQUE(job_id, kind)
 - `digests`: id, created_at, body, sent_at (null until delivered)
-- `digest_items`: digest_id, position (1-based number shown in the message), job_id
+- `digest_items`: digest_id, position, job_id (marks a job as already shown)
 - `telegram_offset`: single row, last processed update_id
 
-Short numbers in commands (`/applied 3`) map through the most recent digest's
-`digest_items`. `/list` prints saved and applied jobs with their own numbers.
+Every job has a permanent number (`jobs.num`), shown as `#N` in digests,
+pings, reminders and `/list`, so `/applied 12` always means the same job no
+matter which message it came from.
 
 ### Digest and alerts
 
@@ -143,7 +146,7 @@ Rules follow the existing news-digest preferences: compact, no extra sections.
 
 - **Weekly digest:** top 8 jobs with `fit >= 6`, sorted by fit desc then
   deadline asc (unknown deadlines last). Each item is two lines:
-  `3. ICONIQ, Financial Advisory Analyst · 9/10 · closes Oct 30`
+  `#12 ICONIQ, Financial Advisory Analyst · 9/10 · closes Oct 30`
   `Summer 2027 start, options trading in role · <link>`
   Footer: counts only (`23 more below 6 · 2 sources failed: Lever/harrisonst`).
 - **Urgent ping:** a job with `fit >= 8` and a deadline within 7 days, sent once,
