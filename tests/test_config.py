@@ -60,3 +60,16 @@ def test_settings_defaults(monkeypatch, tmp_path):
     assert s.anthropic_model == "claude-sonnet-5"
     assert s.handshake_enabled is True
     assert s.db_path == Path("jobscout.db")
+
+
+def test_title_include_defaults_empty(tmp_path):
+    path = tmp_path / "w.toml"
+    path.write_text(
+        "[profile]\navailable_from = 2027-06-01\n\n"
+        '[[company]]\nname = "A"\nats = "ashby"\ntoken = "a"\ntitle_include = ["financ"]\n\n'
+        '[[company]]\nname = "B"\nats = "lever"\ntoken = "b"\n',
+        encoding="utf-8",
+    )
+    wl = load_watchlist(path)
+    assert wl.company[0].title_include == ["financ"]
+    assert wl.company[1].title_include == []

@@ -31,6 +31,8 @@ _NON_US = re.compile(
     re.I,
 )
 _US_WORDS = re.compile(r"\b(?:united states|usa|u\.s\.?|us|new york|nyc)\b", re.I)
+# Country-code prefixes some boards use, e.g. "IN-Pune", "GB-London", "US-CA-Menlo Park".
+_CODE_PREFIX = re.compile(r"^([A-Z]{2})-")
 _US_STATE = re.compile(
     r",\s*(?:AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|"
     r"NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|DC)\b"
@@ -45,12 +47,21 @@ def required_years(text: str) -> int | None:
 
 def is_non_us(location: str) -> bool:
     """True only when the location clearly names a non-U.S. place and no U.S. one."""
+    if (m := _CODE_PREFIX.match(location.strip())) and m.group(1) != "US":
+        return True
     if not _NON_US.search(location):
         return False
     return not (_US_WORDS.search(location) or _US_STATE.search(location))
 
 
-def apply_rules(posting: Posting, profile: Profile, allow_non_us: bool = False) -> RuleResult:
+def apply_rules(
+    posting: Posting,
+    profile: Profile,
+    allow_non_us: bool = False,
+    title_include: list[str] | None = None,
+) -> RuleResult:
+    if title_include and not any(w.lower() in posting.title.lower() for w in title_include):
+        return RuleResult(keep=False, reason="title outside company filter")
     if m := _SENIOR.search(posting.title):
         return RuleResult(keep=False, reason=f"seniority: {m.group(0)}")
     if m := _LEVEL.search(posting.title):

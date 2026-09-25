@@ -73,3 +73,10 @@ def test_unsent_digest_is_kept_when_telegram_fails(store):
         store, [Source("Board", lambda: [GOOD])], fake_scorer([]), "m", PROFILE, broken_send, NOW
     )
     assert len(store.unsent_digests()) == 1
+
+
+def test_source_title_include_is_applied(store):
+    calls = []
+    source = Source("Big Co", lambda: [GOOD, WEAK], title_include=("investment",))
+    run_weekly(store, [source], fake_scorer(calls), "m", PROFILE, [].append, NOW)
+    assert calls == ["good"]

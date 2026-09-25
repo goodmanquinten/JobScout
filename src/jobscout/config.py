@@ -41,6 +41,8 @@ class Company(BaseModel):
     ats: Literal["greenhouse", "lever", "ashby"]
     token: str
     allow_non_us: bool = False
+    # For big employers: only titles containing one of these (case-insensitive) are kept.
+    title_include: list[str] = Field(default_factory=list)
 
 
 class Watchlist(BaseModel):

@@ -98,3 +98,21 @@ def test_non_us_rejected_unless_allowed():
     assert rejected.keep is False
     assert rejected.reason == "non-US: London, England"
     assert apply_rules(p, PROFILE, allow_non_us=True).keep is True
+
+
+@pytest.mark.parametrize(
+    ("location", "non_us"),
+    [("IN-Pune", True), ("GB-London", True), ("US-CA-Menlo Park", False), ("US-NY-Remote", False)],
+)
+def test_country_code_prefixed_locations(location, non_us):
+    assert is_non_us(location) is non_us
+
+
+def test_title_include_limits_big_employers():
+    include = ["financ", "fp&a"]
+    kept = apply_rules(make_posting(title="Financial Analyst I"), PROFILE, title_include=include)
+    dropped = apply_rules(make_posting(title="Software Engineer"), PROFILE, title_include=include)
+    assert kept.keep is True
+    assert dropped.keep is False
+    assert dropped.reason == "title outside company filter"
+    assert apply_rules(make_posting(title="Software Engineer"), PROFILE).keep is True

@@ -39,6 +39,7 @@ class Source:
     name: str
     fetch: Callable[[], list[Posting]]
     allow_non_us: bool = False
+    title_include: tuple[str, ...] = ()
 
 
 def run_weekly(
@@ -61,7 +62,8 @@ def run_weekly(
         log.info("source %s: %d postings", source.name, len(postings))
         for p in postings:
             store.upsert_posting(p, now)
-            store.record_rule(p.job_id, apply_rules(p, profile, source.allow_non_us), now)
+            result = apply_rules(p, profile, source.allow_non_us, list(source.title_include))
+            store.record_rule(p.job_id, result, now)
 
     since = now - timedelta(days=FRESH_DAYS)
     for p in store.jobs_to_score(since):
@@ -94,7 +96,12 @@ def run_weekly(
 
 def build_sources(client: httpx.Client, settings: Settings, watchlist: Watchlist) -> list[Source]:
     sources = [
-        Source(f"{c.name} ({c.ats})", partial(fetch_company, client, c), c.allow_non_us)
+        Source(
+            f"{c.name} ({c.ats})",
+            partial(fetch_company, client, c),
+            c.allow_non_us,
+            tuple(c.title_include),
+        )
         for c in watchlist.company
     ]
     if settings.handshake_enabled:

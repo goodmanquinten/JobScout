@@ -30,3 +30,15 @@ token = "iconiq"
 name = "Harrison Street"
 ats = "lever"
 token = "harrisonst"
+
+[[company]]
+name = "Anduril"
+ats = "greenhouse"
+token = "andurilindustries"
+title_include = ["financ", "fp&a", "treasury", "investment"]
+
+[[company]]
+name = "Snowflake"
+ats = "ashby"
+token = "snowflake"
+title_include = ["financ", "fp&a", "treasury", "investment"]
