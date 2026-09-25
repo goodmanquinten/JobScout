@@ -108,7 +108,7 @@ def fetch_alert_postings(client: httpx.Client, access_token: str, sender: str) -
 
 
 def load_credentials(credentials_path: Path, token_path: Path, interactive: bool):
-    """OAuth credentials for the read-only Gmail scope. Raises SourceError when re-auth is needed."""
+    """OAuth credentials for the read-only Gmail scope. Raises SourceError if re-auth is needed."""
     from google.auth.exceptions import RefreshError
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
