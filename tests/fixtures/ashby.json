@@ -1,0 +1,21 @@
+{
+  "jobs": [
+    {
+      "id": "a1b2c3",
+      "title": "Strategic Finance Analyst",
+      "location": "Menlo Park, CA",
+      "jobUrl": "https://jobs.ashbyhq.com/example/a1b2c3",
+      "descriptionPlain": "Build models that shape pricing.",
+      "publishedAt": "2026-09-10T00:00:00.000Z",
+      "isListed": true
+    },
+    {
+      "id": "hidden",
+      "title": "Unlisted Role",
+      "location": "Menlo Park, CA",
+      "jobUrl": "https://jobs.ashbyhq.com/example/hidden",
+      "descriptionPlain": "",
+      "isListed": false
+    }
+  ]
+}
