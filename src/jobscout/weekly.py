@@ -23,7 +23,7 @@ from jobscout.models import Posting, Score
 from jobscout.score import ClaudeScorer, ScoreError, make_client
 from jobscout.sources.ats import USER_AGENT, SourceError, fetch_company
 from jobscout.sources.handshake_mail import fetch_handshake
-from jobscout.store import Store
+from jobscout.store import FRESH_DAYS, Store
 from jobscout.telegram import TelegramError, send_message
 
 log = logging.getLogger(__name__)
@@ -31,7 +31,6 @@ log = logging.getLogger(__name__)
 LOG_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
 MIN_FIT = 6
 DIGEST_SIZE = 8
-FRESH_DAYS = 8
 
 
 def setup_logging() -> None:

@@ -61,6 +61,17 @@ def format_reminder(row: DigestRow, today: date) -> str:
     return f"<b>Saved job closes {when}</b>\n{format_row(row)}"
 
 
+def format_top(rows: Sequence[DigestRow]) -> str:
+    if not rows:
+        return "No scored open jobs yet."
+    lines = [f"<b>Top {len(rows)} open jobs</b>"]
+    for row in rows:
+        link = f'<a href="{escape(row.url, quote=True)}">{escape(row.title)}</a>'
+        company = escape(row.company)
+        lines.append(f"#{row.num} {row.fit}/10 {company}, {link}{_closes(row.deadline)}")
+    return "\n".join(lines)
+
+
 def format_list(items: Sequence[tuple[DigestRow, str]]) -> str:
     if not items:
         return "Nothing saved or applied yet."

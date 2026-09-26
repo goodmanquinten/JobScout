@@ -140,3 +140,18 @@ def test_telegram_offset(store):
     store.set_telegram_offset(41)
     store.set_telegram_offset(42)
     assert store.telegram_offset() == 42
+
+
+def test_top_scored_includes_low_and_shown_but_not_skipped_or_closed(store):
+    low = add_scored(store, NOW, fit=2, source_id="low")
+    shown = add_scored(store, NOW, fit=9, source_id="shown")
+    store.create_digest("d", [shown.job_id], NOW)
+    skipped = add_scored(store, NOW, fit=8, source_id="skipped")
+    store.set_status(num_of(store, skipped), "skipped", NOW)
+    add_scored(store, NOW, fit=7, source_id="closed", deadline=date(2026, 9, 1))
+    stale = make_posting(source_id="stale")
+    add_scored(store, NOW - timedelta(days=30), fit=10, source_id="stale")
+    rows = store.top_scored(SINCE, TODAY, limit=20)
+    assert [r.job_id for r in rows] == [shown.job_id, low.job_id]
+    assert stale.job_id not in {r.job_id for r in rows}
+    assert len(store.top_scored(SINCE, TODAY, limit=1)) == 1

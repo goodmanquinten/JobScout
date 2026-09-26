@@ -71,3 +71,15 @@ def test_format_list():
         "<b>Applied</b>\n#3 HSBC, S&amp;T Graduate"
     )
     assert format_list([]) == "Nothing saved or applied yet."
+
+
+def test_format_top():
+    from jobscout.digest import format_top
+
+    text = format_top([ROW])
+    assert text == (
+        "<b>Top 1 open jobs</b>\n"
+        '#12 9/10 ICONIQ, <a href="https://example.com/a?b=1&amp;c=2">'
+        "Analyst, Financial Advisory</a> · closes Oct 30"
+    )
+    assert format_top([]) == "No scored open jobs yet."

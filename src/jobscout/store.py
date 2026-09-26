@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS telegram_offset (
 """
 
 MAX_ATTEMPTS = 3
+FRESH_DAYS = 8  # a job not seen in any source for this long counts as closed
 _DEADLINE = "COALESCE(j.deadline, s.deadline)"
 _ROWS = f"""
 SELECT j.num, j.job_id, j.company, j.title, j.url, s.fit, s.reason,
@@ -244,6 +245,17 @@ class Store:
             " AND j.job_id NOT IN (SELECT job_id FROM digest_items)"
             f" ORDER BY s.fit DESC, {_DEADLINE} IS NULL, {_DEADLINE}, j.num LIMIT ?",
             (min_fit, since.isoformat(), today.isoformat(), limit),
+        ).fetchall()
+        return [_row(r) for r in rows]
+
+    def top_scored(self, since: datetime, today: date, limit: int) -> list[DigestRow]:
+        """All scored, still-open jobs (any fit, shown before or not), best first."""
+        rows = self.conn.execute(
+            _ROWS + " WHERE s.fit IS NOT NULL AND j.last_seen >= ?"
+            " AND COALESCE(st.state, 'new') != 'skipped'"
+            f" AND ({_DEADLINE} IS NULL OR {_DEADLINE} >= ?)"
+            f" ORDER BY s.fit DESC, {_DEADLINE} IS NULL, {_DEADLINE}, j.num LIMIT ?",
+            (since.isoformat(), today.isoformat(), limit),
         ).fetchall()
         return [_row(r) for r in rows]
 

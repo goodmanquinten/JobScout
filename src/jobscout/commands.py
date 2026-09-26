@@ -4,15 +4,18 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from html import escape
 
-from jobscout.digest import format_list
-from jobscout.store import Store
+from jobscout.alerts import LISBON
+from jobscout.digest import format_list, format_top
+from jobscout.store import FRESH_DAYS, Store
 
-HELP = "Commands: /save N, /applied N, /skip N, /list"
+HELP = "Commands: /top [N], /save N, /applied N, /skip N, /list"
+DEFAULT_TOP = 20
+MAX_TOP = 50
 _STATES = {"save": "saved", "applied": "applied", "skip": "skipped"}
-_COMMAND = re.compile(r"^/(save|applied|skip|list)(?:@\w+)?(?:\s+#?(\d+))?\s*$", re.I)
+_COMMAND = re.compile(r"^/(save|applied|skip|list|top)(?:@\w+)?(?:\s+#?(\d+))?\s*$", re.I)
 
 
 @dataclass(frozen=True)
@@ -35,6 +38,10 @@ def handle(store: Store, text: str, now: datetime) -> str:
         return HELP
     if cmd.name == "list":
         return format_list(store.saved_and_applied())
+    if cmd.name == "top":
+        limit = min(cmd.num or DEFAULT_TOP, MAX_TOP)
+        since = now - timedelta(days=FRESH_DAYS)
+        return format_top(store.top_scored(since, now.astimezone(LISBON).date(), limit))
     if cmd.num is None:
         return f"Usage: /{cmd.name} N"
     state = _STATES[cmd.name]
