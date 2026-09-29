@@ -33,7 +33,7 @@ uv run python -m jobscout.weekly   # fetch, score, send digest
 uv run python -m jobscout.hourly   # commands, resend, pings
 ```
 
-Reply `/top` (or `/top 30`) for every scored open job, best first. Reply with `/save 12`, `/applied 12`, `/skip 12` or `/list`.
+Reply `/top` (or `/top 30`) for every scored open job, best first. Reply with `/save 12`, `/applied 12`, `/skip 12` or `/list`. After a rejection, `/rejected 12` (or `/rejected ICONIQ`) blocks that company from all future recommendations.
 
 ## Schedule (Windows Task Scheduler, times are this PC's local time)
 

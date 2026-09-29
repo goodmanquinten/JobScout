@@ -1,4 +1,4 @@
-"""Telegram replies: /save N, /applied N, /skip N, /list."""
+"""Telegram replies: /top, /save N, /applied N, /skip N, /rejected N|Company, /list."""
 
 from __future__ import annotations
 
@@ -11,20 +11,24 @@ from jobscout.alerts import LISBON
 from jobscout.digest import format_list, format_top
 from jobscout.store import FRESH_DAYS, Store
 
-HELP = "Commands: /top [N], /save N, /applied N, /skip N, /list"
+HELP = "Commands: /top [N], /save N, /applied N, /skip N, /rejected N|Company, /list"
 DEFAULT_TOP = 20
 MAX_TOP = 50
-_STATES = {"save": "saved", "applied": "applied", "skip": "skipped"}
-_COMMAND = re.compile(r"^/(save|applied|skip|list|top)(?:@\w+)?(?:\s+#?(\d+))?\s*$", re.I)
+_STATES = {"save": "saved", "applied": "applied", "skip": "skipped", "rejected": "rejected"}
+_REJECTED = re.compile(r"^/rejected(?:@\w+)?\s+(?!#?\d+\s*$)(.+?)\s*$", re.I)
+_COMMAND = re.compile(r"^/(save|applied|skip|list|top|rejected)(?:@\w+)?(?:\s+#?(\d+))?\s*$", re.I)
 
 
 @dataclass(frozen=True)
 class Command:
     name: str
     num: int | None
+    arg: str | None = None  # company name for "/rejected Company"
 
 
 def parse_command(text: str) -> Command | None:
+    if m := _REJECTED.match(text.strip()):
+        return Command("rejected", None, m.group(1))
     m = _COMMAND.match(text.strip())
     if not m:
         return None
@@ -42,6 +46,13 @@ def handle(store: Store, text: str, now: datetime) -> str:
         limit = min(cmd.num or DEFAULT_TOP, MAX_TOP)
         since = now - timedelta(days=FRESH_DAYS)
         return format_top(store.top_scored(since, now.astimezone(LISBON).date(), limit))
+    if cmd.name == "rejected" and cmd.num is None:
+        if not cmd.arg:
+            return "Usage: /rejected N or /rejected Company"
+        company = escape(cmd.arg)
+        if store.block_company(cmd.arg, now):
+            return f"{company} is now blocked."
+        return f"{company} was already blocked."
     if cmd.num is None:
         return f"Usage: /{cmd.name} N"
     state = _STATES[cmd.name]
@@ -49,4 +60,8 @@ def handle(store: Store, text: str, now: datetime) -> str:
     if job is None:
         return f"No job #{cmd.num}."
     company, title = job
-    return f"#{cmd.num} {escape(company)}, {escape(title)}: {state}"
+    reply = f"#{cmd.num} {escape(company)}, {escape(title)}: {state}"
+    if cmd.name == "rejected":
+        store.block_company(company, now)
+        reply += f". {escape(company)} is now blocked."
+    return reply

@@ -6,6 +6,7 @@ plain string comparison orders both correctly. Callers must pass UTC `now` value
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -70,6 +71,10 @@ CREATE TABLE IF NOT EXISTS digest_items (
     job_id TEXT NOT NULL,
     PRIMARY KEY (digest_id, position)
 );
+CREATE TABLE IF NOT EXISTS blocked_companies (
+    company TEXT PRIMARY KEY,  -- normalized name, see normalize_company
+    blocked_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS telegram_offset (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     update_id INTEGER NOT NULL
@@ -86,6 +91,25 @@ FROM jobs j
 JOIN scores s ON s.job_id = j.job_id
 LEFT JOIN status st ON st.job_id = j.job_id
 """
+
+
+_SUFFIXES = {"inc", "llc", "lp", "llp", "ltd", "corp", "corporation", "co", "company"}
+
+
+def normalize_company(name: str) -> str:
+    """Lowercase, no punctuation or legal suffix: 'ICONIQ Capital, LLC' -> 'iconiq capital'."""
+    words = re.sub(r"[^a-z0-9]+", " ", name.lower()).split()
+    while words and words[-1] in _SUFFIXES:
+        words.pop()
+    return " ".join(words)
+
+
+def company_matches(company: str, blocked: str) -> bool:
+    """Same company when one normalized name equals, or is a word-prefix of, the other."""
+    a, b = normalize_company(company), normalize_company(blocked)
+    if not a or not b:
+        return False
+    return a == b or a.startswith(b + " ") or b.startswith(a + " ")
 
 
 def _iso(value: date | datetime | None) -> str | None:
@@ -124,6 +148,13 @@ class Store:
         conn.row_factory = sqlite3.Row
         conn.executescript(SCHEMA)
         self.conn = conn
+        self._blocked = [
+            r["company"] for r in conn.execute("SELECT company FROM blocked_companies")
+        ]
+        conn.create_function("is_blocked", 1, self._is_blocked)
+
+    def _is_blocked(self, company: str) -> int:
+        return int(any(company_matches(company, b) for b in self._blocked))
 
     @classmethod
     def open(cls, path: Path | str) -> Store:
@@ -176,7 +207,7 @@ class Store:
             "SELECT j.* FROM jobs j"
             " JOIN rule_results r ON r.job_id = j.job_id AND r.keep = 1"
             " LEFT JOIN scores s ON s.job_id = j.job_id"
-            " WHERE j.last_seen >= ?"
+            " WHERE j.last_seen >= ? AND NOT is_blocked(j.company)"
             " AND (s.job_id IS NULL OR s.content_hash != j.content_hash"
             "      OR (s.fit IS NULL AND s.attempts < ?))"
             " ORDER BY j.num",
@@ -239,7 +270,7 @@ class Store:
     ) -> list[DigestRow]:
         """Best new, still-open jobs never shown in a digest."""
         rows = self.conn.execute(
-            _ROWS + " WHERE s.fit >= ? AND j.last_seen >= ?"
+            _ROWS + " WHERE s.fit >= ? AND j.last_seen >= ? AND NOT is_blocked(j.company)"
             " AND COALESCE(st.state, 'new') = 'new'"
             f" AND ({_DEADLINE} IS NULL OR {_DEADLINE} >= ?)"
             " AND j.job_id NOT IN (SELECT job_id FROM digest_items)"
@@ -251,8 +282,8 @@ class Store:
     def top_scored(self, since: datetime, today: date, limit: int) -> list[DigestRow]:
         """All scored, still-open jobs (any fit, shown before or not), best first."""
         rows = self.conn.execute(
-            _ROWS + " WHERE s.fit IS NOT NULL AND j.last_seen >= ?"
-            " AND COALESCE(st.state, 'new') != 'skipped'"
+            _ROWS + " WHERE s.fit IS NOT NULL AND j.last_seen >= ? AND NOT is_blocked(j.company)"
+            " AND COALESCE(st.state, 'new') NOT IN ('skipped', 'rejected')"
             f" AND ({_DEADLINE} IS NULL OR {_DEADLINE} >= ?)"
             f" ORDER BY s.fit DESC, {_DEADLINE} IS NULL, {_DEADLINE}, j.num LIMIT ?",
             (since.isoformat(), today.isoformat(), limit),
@@ -314,12 +345,31 @@ class Store:
         ).fetchall()
         return [(_row(r), r["state"]) for r in rows]
 
+    # --- blocked companies -----------------------------------------------------------
+
+    def block_company(self, company: str, now: datetime) -> bool:
+        """Never recommend this company again. Returns False if it was already blocked."""
+        name = normalize_company(company)
+        if not name or any(company_matches(name, b) for b in self._blocked):
+            return False
+        with self.conn:
+            self.conn.execute(
+                "INSERT INTO blocked_companies (company, blocked_at) VALUES (?, ?)",
+                (name, now.isoformat()),
+            )
+        self._blocked.append(name)
+        return True
+
+    def blocked_companies(self) -> list[str]:
+        return sorted(self._blocked)
+
     # --- alerts --------------------------------------------------------------------
 
     def urgent_candidates(self, today: date, min_fit: int, within_days: int) -> list[DigestRow]:
         until = today + timedelta(days=within_days)
         rows = self.conn.execute(
-            _ROWS + f" WHERE s.fit >= ? AND {_DEADLINE} BETWEEN ? AND ?"
+            _ROWS
+            + f" WHERE s.fit >= ? AND {_DEADLINE} BETWEEN ? AND ? AND NOT is_blocked(j.company)"
             " AND COALESCE(st.state, 'new') IN ('new', 'saved')"
             " AND NOT EXISTS (SELECT 1 FROM alerts a"
             "                 WHERE a.job_id = j.job_id AND a.kind = 'urgent')"
@@ -332,6 +382,7 @@ class Store:
         until = today + timedelta(days=days_before)
         rows = self.conn.execute(
             _ROWS + f" WHERE st.state = 'saved' AND {_DEADLINE} BETWEEN ? AND ?"
+            " AND NOT is_blocked(j.company)"
             " AND NOT EXISTS (SELECT 1 FROM alerts a"
             "                 WHERE a.job_id = j.job_id AND a.kind = 'reminder')"
             f" ORDER BY {_DEADLINE}, j.num",

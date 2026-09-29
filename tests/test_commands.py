@@ -50,3 +50,20 @@ def test_top_command(store):
     assert reply.startswith("<b>Top 2 open jobs</b>")
     assert "Job 9" in reply and "Job 6" in reply and "Job 3" not in reply
     assert "Job 3" in handle(store, "/top", NOW)
+
+
+def test_rejected_by_number_blocks_company(store):
+    p = add_scored(store, NOW, fit=9)
+    n = num_of(store, p)
+    assert parse_command(f"/rejected {n}") == Command("rejected", n)
+    reply = handle(store, f"/rejected {n}", NOW)
+    assert reply == f"#{n} ICONIQ, Analyst, Financial Advisory: rejected. ICONIQ is now blocked."
+    assert store.state_of(p.job_id) == "rejected"
+    assert store.blocked_companies() == ["iconiq"]
+
+
+def test_rejected_by_company_name(store):
+    assert parse_command("/rejected ICONIQ Capital") == Command("rejected", None, "ICONIQ Capital")
+    assert handle(store, "/rejected ICONIQ Capital", NOW) == "ICONIQ Capital is now blocked."
+    assert handle(store, "/rejected iconiq capital", NOW) == "iconiq capital was already blocked."
+    assert handle(store, "/rejected", NOW) == "Usage: /rejected N or /rejected Company"

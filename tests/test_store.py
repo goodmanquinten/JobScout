@@ -155,3 +155,42 @@ def test_top_scored_includes_low_and_shown_but_not_skipped_or_closed(store):
     assert [r.job_id for r in rows] == [shown.job_id, low.job_id]
     assert stale.job_id not in {r.job_id for r in rows}
     assert len(store.top_scored(SINCE, TODAY, limit=1)) == 1
+
+
+def test_normalize_company():
+    from jobscout.store import company_matches, normalize_company
+
+    assert normalize_company("ICONIQ Capital, LLC") == "iconiq capital"
+    assert company_matches("ICONIQ Capital", "iconiq")
+    assert company_matches("ICONIQ", "iconiq capital")
+    assert not company_matches("Iconiqa Partners", "iconiq")
+
+
+def test_blocked_company_disappears_everywhere(store):
+    keep = add_scored(store, NOW, fit=7, source_id="keep", company="Bloomberg")
+    add_scored(store, NOW, fit=9, source_id="a", company="ICONIQ", deadline=date(2026, 10, 1))
+    saved = add_scored(
+        store, NOW, fit=6, source_id="b", company="ICONIQ Capital", deadline=date(2026, 9, 30)
+    )
+    store.set_status(num_of(store, saved), "saved", NOW)
+    unscored = make_posting(source_id="c", company="ICONIQ")
+    store.upsert_posting(unscored, NOW)
+    store.record_rule(unscored.job_id, RuleResult(keep=True), NOW)
+
+    assert store.block_company("ICONIQ", NOW) is True
+    assert store.block_company("iconiq", NOW) is False  # already blocked
+
+    assert [r.job_id for r in store.digest_candidates(6, SINCE, TODAY, 10)] == [keep.job_id]
+    assert [r.job_id for r in store.top_scored(SINCE, TODAY, 10)] == [keep.job_id]
+    assert store.urgent_candidates(TODAY, 8, 7) == []
+    assert store.reminder_candidates(TODAY, 3) == []
+    assert store.jobs_to_score(SINCE) == []
+    assert store.blocked_companies() == ["iconiq"]
+
+
+def test_blocks_survive_reopening(tmp_path):
+    from jobscout.store import Store
+
+    path = tmp_path / "db.sqlite"
+    Store.open(path).block_company("ICONIQ", NOW)
+    assert Store.open(path).blocked_companies() == ["iconiq"]

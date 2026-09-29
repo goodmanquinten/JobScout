@@ -9,7 +9,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 Timing = Literal["fits_june_2027", "unclear", "needs_start_now"]
-JobState = Literal["new", "saved", "applied", "skipped"]
+JobState = Literal["new", "saved", "applied", "skipped", "rejected"]
 
 
 def _short_hash(text: str) -> str:
