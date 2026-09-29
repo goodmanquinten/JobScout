@@ -5,6 +5,31 @@ obvious non-fits, has Claude score the rest against your profile, and sends a
 compact Telegram digest. Strong matches closing within 7 days get an immediate
 ping; saved jobs get a reminder 3 days before their deadline.
 
+![Weekly digest in Telegram](docs/images/digest.png)
+
+## How it works
+
+```
+Company job boards (ATS APIs) ─┐
+                               ├─> rule filter ─> Claude scores vs. resume ─> SQLite ─> Telegram
+Handshake alert emails (Gmail) ┘                                                    ^      |
+                                                                  /save /applied /skip <───┘
+```
+
+1. **Collect.** Pulls postings from a watchlist of company job boards and
+   parses Handshake alert emails through the Gmail API.
+2. **Filter.** Cheap rules drop obvious non-fits (senior titles, years of
+   experience required, non-U.S. locations) before any model call.
+3. **Score.** Claude rates each remaining posting 1–10 against the resume and
+   returns a one-line reason as structured output. Postings whose start date
+   doesn't fit get their score capped.
+4. **Deliver.** A weekly Telegram digest ranks the matches. Telegram replies
+   (`/save`, `/applied`, `/skip`, `/rejected`) update the SQLite store, which
+   drives the deadline pings and reminders.
+
+**Stack:** Python 3.11, Claude API, Gmail API, Telegram Bot API, SQLite,
+pydantic, uv, pytest.
+
 ## Setup
 
 1. `uv venv --python "C:/Users/quint/AppData/Local/Programs/Python/Python311/python.exe"` then `uv sync`.
